@@ -1,0 +1,2183 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Empaque — Rendimiento por bonchador</title>
+  <style>
+    :root{
+      --bg:#0b1220;--panel:#0f1b2f;--panel2:#0c1628;--text:#e7eefc;--muted:#9bb0d0;--line:#1f3358;
+      --ok:#22c55e;--bad:#ef4444;--warn:#f59e0b
+    }
+    *{box-sizing:border-box;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+    body{margin:0;background:var(--bg);color:var(--text)}
+    .wrap{max-width:1250px;margin:0 auto;padding:16px}
+    .top{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+    .title{font-weight:900;font-size:18px}
+    .status{display:flex;gap:8px;align-items:center;color:var(--muted);font-size:13px}
+    .dot{width:10px;height:10px;border-radius:50%;background:var(--warn)}
+    .dot.ok{background:var(--ok)}
+    .dot.bad{background:var(--bad)}
+    .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:12px;margin-top:12px}
+    .card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line);border-radius:14px;padding:12px}
+    .right{grid-column:span 12}
+    @media(max-width:1020px){.right{grid-column:span 12}}
+    label{display:block;color:var(--muted);font-size:12px;margin:10px 0 6px}
+    input,button,select{width:100%;background:rgba(15,27,47,.9);color:var(--text);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:13px;outline:none}
+    button{cursor:pointer}
+    button.ghost{background:transparent}
+    .pill{display:inline-block;padding:3px 8px;border-radius:999px;border:1px solid var(--line);background:rgba(10,18,32,.35);font-size:11px}
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace}
+    .hint{color:var(--muted);font-size:12px;line-height:1.35}
+    .split{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+    .scanBox{border:1px dashed rgba(155,176,208,.5);border-radius:14px;padding:10px;background:rgba(10,18,32,.22);margin-top:10px}
+    .okTxt{color:rgba(34,197,94,.95)}
+    .warnTxt{color:rgba(255, 0, 0, 0.95)}
+    /* =========================
+   TARJETAS DE LÁMINA (DESTACADAS)
+   ========================= */
+
+.laminaCard {
+  background: #0D3B66 !important; /* ← AQUÍ CAMBIAS EL COLOR */
+  border: 2px solid #22c55e;
+}
+
+.laminaCard .name {
+  color: #ffffff; /* verde claro */
+}
+
+.laminaCard .bigNum {
+  color: #ecfdf5; /* blanco verdoso */
+}
+
+.laminaCard .subPill {
+  background: rgba(34,197,94,.12);
+  border: 1px solid rgba(34,197,94,.35);
+  color: #d1fae5;
+}
+
+.laminaCard .pill {
+  border-color: rgba(34,197,94,.5);
+  color: #bbf7d0;
+}
+.laminaCard:hover {
+  transform: scale(1.02);
+  transition: all .2s ease;
+  box-shadow: 0 0 18px rgba(34,197,94,.35);
+}
+
+    .chartWrap{
+      position: relative;
+      border:1px solid var(--line);
+      border-radius:12px;
+      background:linear-gradient(180deg, rgba(10,18,32,.35), rgba(10,18,32,.15));
+      margin-top:10px;
+      overflow:hidden;
+    }
+    #chart{display:block;width:100%;height:360px}
+
+    .chartTip{
+      position:absolute;
+      pointer-events:none;
+      background:rgba(14,24,50,.95);
+      color:#fff;
+      border:1px solid rgba(147,197,253,.25);
+      border-radius:10px;
+      padding:8px 10px;
+      font-size:12px;
+      line-height:1.25;
+      box-shadow: 0 6px 18px rgba(0,0,0,.35);
+      transform: translate(-50%, -110%);
+      white-space: nowrap;
+      z-index: 2;
+      opacity:0;
+      transition: opacity .12s ease, transform .12s ease;
+    }
+    .chartTip.show{ opacity:1; transform: translate(-50%, -120%); }
+    .chartTip .tt-head{font-weight:800; font-size:12px; margin-bottom:4px; color:#e6f0ff}
+    .chartTip .tt-row{display:flex;gap:10px;align-items:center}
+    .tt-swatch{width:10px;height:10px;border-radius:3px;display:inline-block}
+
+    .kpiGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px}
+    @media(max-width:1020px){.kpiGrid{grid-template-columns:repeat(2,1fr)}}
+    .kpiCard{border:1px solid var(--line);border-radius:14px;padding:12px;background:rgba(10,18,32,.35)}
+    .kpiCard.active{
+      border-color: rgba(34,197,94,.7);
+      box-shadow: 0 0 0 1px rgba(34,197,94,.15) inset;
+      background: rgba(34,197,94,.06);
+    }
+    .kpiCard .t{display:flex;justify-content:space-between;gap:8px;align-items:center}
+    .kpiCard .name{font-weight:900}
+    .bigNum{font-size:36px;font-weight:950;line-height:1;margin-top:10px}
+    .bigLab{color:var(--muted);font-size:12px;margin-top:4px}
+    .subRow{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+    .subPill{display:inline-block;padding:6px 10px;border-radius:999px;border:1px solid rgba(31,51,88,.7);background:rgba(10,18,32,.25);font-size:12px;color:rgba(200,220,255,.95)}
+    .subPill b{color:#fff}
+    .pill {
+  background: rgba(34,197,94,.2);
+  border: 1px solid #22c55e;
+  color: #22c55e;
+}
+
+.scan-step {
+  display: inline-block;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 800;
+  border: 1px solid rgba(155,176,208,.35);
+  background: rgba(10,18,32,.45);
+  color: #9bb0d0;
+}
+
+.scan-step.done {
+  border-color: rgba(34,197,94,.7);
+  background: rgba(34,197,94,.18);
+  color: #86efac;
+}
+
+.scan-step.pending {
+  border-color: rgba(245,158,11,.65);
+  background: rgba(245,158,11,.14);
+  color: #fbbf24;
+}
+
+.scan-missing-text {
+  font-size: 12px;
+  font-weight: 800;
+  color: #fbbf24;
+}
+
+.scan-missing-text.ready {
+  color: #86efac;
+}
+
+    .scroll{max-height:360px;overflow:auto;border:1px solid var(--line);border-radius:12px;margin-top:10px}
+    table{width:100%;border-collapse:collapse;font-size:12px}
+    thead th{position:sticky;top:0;background:rgba(15,27,47,.95);color:var(--muted);text-align:left;padding:10px 8px;border-bottom:1px solid var(--line)}
+    tbody td{padding:10px 8px;border-bottom:1px solid rgba(31,51,88,.6);vertical-align:top}
+    .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .legend{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+    .legItem{display:flex;gap:8px;align-items:center;border:1px solid rgba(31,51,88,.7);border-radius:999px;padding:6px 10px;background:rgba(10,18,32,.25)}
+    .sw{width:10px;height:10px;border-radius:3px}
+
+    .btnDeleteScan {
+  background: linear-gradient(135deg,#7f1d1d,#dc2626);
+  color: #fff;
+  border: 1px solid rgba(239,68,68,.45);
+  border-radius: 10px;
+  padding: 7px 10px;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.btnDeleteScan:hover {
+  opacity: .9;
+}
+  
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div class="title">GRAFICA - RENDIMIENTOS - PRESTIGE P2</div>
+    <div class="status">
+      <span id="dot" class="dot"></span>
+      <span id="st">Conectando…</span>
+      <span id="mode" class="hint"></span>
+    </div>
+  </div>
+
+  <input
+  id="scanInput"
+  autocomplete="off"
+  autocapitalize="off"
+  spellcheck="false"
+  autofocus
+  tabindex="0"
+  inputmode="none"
+  style="
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 20px;
+    height: 20px;
+    opacity: 0.01;
+    border: none;
+    outline: none;
+    background: transparent;
+    color: transparent;
+    z-index: 999999;
+  "
+/>
+
+  <div class="grid">
+    <div class="card right card-rendimiento">
+    <div class="split">
+  <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+  <div id="scanProgressBox" class="scan-progress-box">
+    <span id="stepWorker" class="scan-step pending">Bonchador</span>
+    <span id="stepVariedad" class="scan-step pending">Variedad</span>
+    <span id="stepGrado" class="scan-step pending">Grado</span>
+    <span id="stepLamina" class="scan-step pending">Lámina</span>
+  </div>
+
+  <div id="scanMissingText" class="scan-missing-text">
+    Faltan 4 escaneos
+  </div>
+</div>
+    <div id="offlineStatus" class="pill mono" style="display:none;"></div>
+  </div>
+
+  <div class="row2" style="width:420px;max-width:40%;">
+    <select id="windowSel">
+      <option value="hour">Última hora</option>
+      <option value="today">Total hoy</option>
+    </select>
+
+    <select id="activeSel" title="Qué mostrar">
+      <option value="active">Solo activos</option>
+      <option value="all">Todos</option>
+    </select>
+  </div>
+</div>
+
+      <div class="split" style="margin-top:8px;">
+        <div class="hint" id="kpiText">—</div>
+        <div class="hint" id="kpiSub">—</div>
+      </div>
+
+      <div class="chartWrap">
+        <canvas id="chart"></canvas>
+        <div id="chartTip" class="chartTip"></div>
+      </div>
+
+      <div class="hint" style="margin-top:6px;">
+        Barras = ramos por bonchador (según ventana). Tooltip muestra ramos/tallos.
+      </div>
+
+      <div class="legend" id="legend"></div>
+      <div class="kpiGrid" id="workerCards"></div>
+
+      <div class="split" style="margin-top:12px;">
+  <div class="pill" style="font-size:18px;padding:10px 16px;">
+  Resumen por lámina
+</div>
+</div>
+<div id="laminaCards" class="kpiGrid" style="margin-top:10px;"></div>
+
+<div class="split" style="margin-top:12px;">
+  <div class="pill">Resumen por variedad</div>
+</div>
+<div class="scroll" style="margin-top:8px;">
+  <table>
+    <thead>
+      <tr>
+        <th>Variedad</th>
+        <th>Registros</th>
+        <th>Tallos</th>
+      </tr>
+    </thead>
+    <tbody id="tbVariedad"></tbody>
+  </table>
+</div>
+
+      <div class="split" style="margin-top:12px;">
+  <div class="pill">Últimos registros</div>
+
+  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+    <select id="workerFilter" style="width:220px;">
+      <option value="">Todos los bonchadores</option>
+    </select>
+
+    <div class="hint" id="countInfo">0</div>
+  </div>
+</div>
+
+      <div class="scroll" style="margin-top:8px;">
+        <table>
+          <thead>
+            <tr>
+              <th>Hora</th>
+              <th>Bonchador</th>
+              <th>Nombre</th>
+              <th>Tallos</th>
+              <th>Variedad</th>
+              <th>Grado</th>
+              <th>Lámina</th>
+              <th>Acción</th>
+            </tr>
+          </thead>
+          <tbody id="tb"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card right card-escaneo">
+      <div class="split">
+        <span class="pill" id="pillApi">API: —</span>
+        <span class="pill mono" id="capState">CAPTURA: INACTIVA</span>
+      </div>
+
+      <div class="scanBox">
+        <div class="split">
+          <div class="pill">Escaneo</div>
+          <button id="btnFocus" class="ghost" type="button">Activar captura (F9)</button>
+        </div>
+
+        <div class="hint" style="margin-top:8px;">
+          Bonchador pendiente: <span id="lastWorkerForV" class="mono warnTxt">—</span><br>
+Código V pendiente: <span id="lastVPending" class="mono warnTxt">—</span><br>
+Grado pendiente: <span id="lastGPending" class="mono warnTxt">—</span><br>
+Lámina pendiente: <span id="lastLPending" class="mono warnTxt">—</span><br><br>
+
+          Código 1 (bonchador + tallos): <span class="mono">B01-T20</span><br>
+Código 2 (variedad): <span class="mono">V01</span><br>
+Código 3 (grado): <span class="mono">G60</span><br>
+Código 4 (lámina): <span class="mono">L1</span><br><br>
+          • <b>B01-T20</b> = bonchador B01 con 20 tallos<br>
+          • <b>V01-60</b> = variedad V01 con grado 60<br>
+          • <b>L1</b> = lámina 1<br><br>
+
+          El sistema enviará el registro cuando tenga los 3 escaneos completos.
+          Se puede escanear en cualquier orden.
+        </div>
+
+        <label style="margin-top:10px;">Entrada manual (teclado)</label>
+        <input id="manualScan" class="mono" placeholder="Ej: B01-T20  ó  V01  ó  G60  ó  L1  (Enter)" />
+
+        <div class="split" style="margin-top:8px; gap:8px;">
+          <div class="hint">Último envío: <span id="lastScan" class="mono warnTxt">—</span></div>
+        </div>
+
+        <div class="split" style="margin-top:8px; gap:8px;">
+          <span class="pill mono" id="serialState">SERIAL: DESCONECTADO</span>
+          <button id="btnSerial" class="ghost" type="button" title="Conectar lector USB que expone puerto serial (COM)">
+            Conectar lector USB (Serial)
+          </button>
+        </div>
+      </div>
+
+      <label style="margin-top:12px;">Nombres de bonchadores</label>
+      <div id="namesBox" style="display:grid;grid-template-columns:1fr;gap:8px;"></div>
+      <button id="btnSaveNames" class="ghost" type="button" style="margin-top:8px;">Guardar nombres</button>
+
+      <label style="margin-top:12px;">Pendientes por bonchador</label>
+      <div class="hint mono" id="pendingBox"
+           style="padding:10px;border:1px solid var(--line);border-radius:12px;background:rgba(10,18,32,.25);white-space:pre-wrap">—</div>
+
+      <button id="btnRefresh" class="ghost" type="button" style="margin-top:10px;">Refrescar</button>
+      <div class="hint" style="margin-top:8px;">Teclas: F9 activa captura.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+
+  
+(() => {
+  const API = (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
+    ? "http://127.0.0.1:3000"
+    : "https://puntabandap2-production.up.railway.app";
+
+  const $ = (id) => document.getElementById(id);
+
+  const dot = $("dot"), st = $("st"), mode = $("mode");
+  const pillApi = $("pillApi"), capState = $("capState");
+  const btnFocus = $("btnFocus");
+  const manualScan = $("manualScan");
+  const scanInput = $("scanInput");
+  const lastScanEl = $("lastScan");
+  const pendingBox = $("pendingBox");
+  const btnRefresh = $("btnRefresh");
+  const offlineStatus = $("offlineStatus");
+  const laminaCards = $("laminaCards");
+
+const tbLamina = $("tbLamina");
+const tbVariedad = $("tbVariedad");
+
+  const chart = $("chart");
+  const chartTip = $("chartTip");
+  const kpiText = $("kpiText");
+  const kpiSub = $("kpiSub");
+  const workerCards = $("workerCards");
+  const legend = $("legend");
+
+  const windowSel = $("windowSel");
+  const activeSel = $("activeSel");
+
+  const namesBox = $("namesBox");
+  const btnSaveNames = $("btnSaveNames");
+  const tb = $("tb");
+  const countInfo = $("countInfo");
+  const workerFilter = $("workerFilter");
+  const scanProgressBox = $("scanProgressBox");
+const stepWorker = $("stepWorker");
+const stepVariedad = $("stepVariedad");
+const stepGrado = $("stepGrado");
+const stepLamina = $("stepLamina");
+const scanMissingText = $("scanMissingText");
+
+  const lastWorkerEl = $("lastWorkerForV");
+  const lastVEl = $("lastVPending");
+const lastGEl = $("lastGPending");
+const lastLEl = $("lastLPending");
+
+  const btnSerial = $("btnSerial");
+  const serialState = $("serialState");
+
+  let captureEnabled = false;
+
+  let workers = ["B01","B02","B03","B04","B05","B06","B07","B08","B09","B10","B11","B12"];
+  let workerNameMap = {};
+  let scans = [];
+  let pendingAll = {};
+  let es = null;
+
+  let pendingWorker = null; // { raw, code, tallos }
+  let pendingV = null;      // { raw, variedad, grado }
+  let pendingL = null;      // { raw, id }
+  let pendingG = null;
+
+  const palette = ["#f3ff05","#16A34A","#F97316","#DC2626","#fc9df8","#a8e5f7","#EAB308","#059e8d","#6b8a7f","#18fa0c"];
+  const workerColors = {};
+  workers.forEach((w, i) => workerColors[w] = palette[i % palette.length]);
+
+  const setStatus = (ok, text, m) => {
+    dot.className = "dot " + (ok ? "ok" : "bad");
+    st.textContent = text;
+    mode.textContent = m ? "· " + m : "";
+  };
+
+  function showOfflineStatus(text, type = "warn") {
+  if (!offlineStatus) return;
+
+  offlineStatus.style.display = "inline-block";
+  offlineStatus.textContent = text;
+
+  offlineStatus.className = "pill mono";
+
+  if (type === "ok") {
+    offlineStatus.style.borderColor = "rgba(34,197,94,.65)";
+    offlineStatus.style.color = "#bbf7d0";
+    offlineStatus.style.background = "rgba(34,197,94,.14)";
+  } else if (type === "bad") {
+    offlineStatus.style.borderColor = "rgba(239,68,68,.65)";
+    offlineStatus.style.color = "#fecaca";
+    offlineStatus.style.background = "rgba(239,68,68,.14)";
+  } else {
+    offlineStatus.style.borderColor = "rgba(245,158,11,.65)";
+    offlineStatus.style.color = "#fde68a";
+    offlineStatus.style.background = "rgba(245,158,11,.14)";
+  }
+}
+
+function hideOfflineStatusAfter(ms = 5000) {
+  if (!offlineStatus) return;
+
+  setTimeout(() => {
+    offlineStatus.style.display = "none";
+    offlineStatus.textContent = "";
+  }, ms);
+}
+
+  function setCaptureUI() {
+    capState.textContent = captureEnabled ? "CAPTURA: ACTIVA" : "CAPTURA: INACTIVA";
+    capState.className = "pill mono " + (captureEnabled ? "okTxt" : "warnTxt");
+  }
+
+  function focusScan() {
+    captureEnabled = true;
+    setCaptureUI();
+    scanInput.focus({preventScroll:true});
+  }
+
+  function fmtTime(ts) {
+    const d = new Date(ts);
+    if (isNaN(d)) return ts || "";
+    return d.toLocaleTimeString("es-CO",{hour:"2-digit",minute:"2-digit",second:"2-digit"});
+  }
+
+  function sameDay(a, b) {
+    return a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate();
+  }
+
+  function windowFilter(ts){
+    const now = new Date();
+    const d = new Date(ts);
+    if (isNaN(d)) return false;
+    if (windowSel.value === "hour") {
+      const start = new Date(now.getTime() - 60*60*1000);
+      return d >= start && d <= now;
+    }
+    return sameDay(d, now);
+  }
+  function getFilteredScans() {
+  return scans.filter(r => windowFilter(r.ts));
+
+
+  return scans.filter(r => {
+    if (!windowFilter(r.ts)) return false;
+
+    const lamina = String(r.lamina_id || r.lamina_nombre || "").trim().toUpperCase();
+    const variedad = String(r.variedad_id || r.variedad_nombre || "").trim().toUpperCase();
+    const tallos = Number(r.tallos || 0);
+
+    if (laminaVal && lamina !== laminaVal) return false;
+    if (variedadVal && variedad !== variedadVal) return false;
+    if (Number.isFinite(tallosMin) && tallos < tallosMin) return false;
+
+    return true;
+  });
+}
+
+  function countsByWorker() {
+  const counts = Object.fromEntries(workers.map(w => [w, 0]));
+  for (const r of getFilteredScans()) {
+    const w = String(r.worker || "").trim().toUpperCase();
+    if (counts[w] != null) counts[w] += 1;
+  }
+  return counts;
+}
+
+  function getOfflineQueue() {
+  try {
+    return JSON.parse(localStorage.getItem("offlineScans") || "[]");
+  } catch {
+    return [];
+  }
+}
+
+function saveOfflineScan(payload) {
+  const queue = getOfflineQueue();
+
+  queue.push({
+    idLocal: crypto.randomUUID(),
+    fechaLocal: new Date().toISOString(),
+    payload,
+    sincronizado: false
+  });
+
+  localStorage.setItem("offlineScans", JSON.stringify(queue));
+}
+
+function removeOfflineScan(idLocal) {
+  const queue = getOfflineQueue().filter(x => x.idLocal !== idLocal);
+  localStorage.setItem("offlineScans", JSON.stringify(queue));
+}
+
+  function stemsByWorkerFiltered() {
+  const stems = Object.fromEntries(workers.map(w => [w, 0]));
+  for (const r of getFilteredScans()) {
+    const w = String(r.worker || "").trim().toUpperCase();
+    const t = Number(r.tallos);
+    if (stems[w] != null && Number.isFinite(t) && t > 0) stems[w] += t;
+  }
+  return stems;
+}
+
+  function hoursInWindow() {
+    const now = new Date();
+    if (windowSel.value === "hour") return 1;
+    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0,0,0,0);
+    const h = (now - start) / (60*60*1000);
+    return Math.max(1, h);
+  }
+
+  function getActiveWorkers(counts){
+    return workers.filter(w => (counts[w] || 0) > 0);
+  }
+
+  function getDisplayWorkers(counts){
+    const active = getActiveWorkers(counts);
+    if (activeSel.value === "active") return active;
+    const inactive = workers.filter(w => !active.includes(w));
+    return [...active, ...inactive];
+  }
+
+  function buildLegend(displayWorkers) {
+    legend.innerHTML = "";
+    for (const w of displayWorkers) {
+      const name = workerNameMap[w] || w;
+      const div = document.createElement("div");
+      div.className = "legItem";
+      div.innerHTML = `<span class="sw" style="background:${workerColors[w] || "#93C5FD"}"></span><span class="mono">${w}</span><span class="hint">${name}</span>`;
+      legend.appendChild(div);
+    }
+  }
+
+  let ctx = null;
+  let cssW = 0, cssH = 0;
+  let resizeObserver = null;
+  let mediaDPR = null;
+
+  function setupHiDPICanvas() {
+    if (!chart) return;
+    if (!ctx) ctx = chart.getContext("2d");
+
+    const rect = chart.getBoundingClientRect();
+    cssW = Math.max(1, Math.floor(rect.width));
+    cssH = Math.max(1, Math.floor(rect.height));
+    const dpr = Math.max(1, Math.round(window.devicePixelRatio || 1));
+
+    if (chart.__cssW === cssW && chart.__cssH === cssH && chart.__dpr === dpr) return;
+
+    chart.width  = Math.round(cssW * dpr);
+    chart.height = Math.round(cssH * dpr);
+
+    ctx.setTransform(1,0,0,1,0,0);
+    ctx.scale(dpr, dpr);
+
+    chart.__cssW = cssW;
+    chart.__cssH = cssH;
+    chart.__dpr  = dpr;
+  }
+
+  function crisp(v) { return Math.round(v) + 0.5; }
+  function roundRectPath(ctx, x, y, w, h, r){
+    const rr = Math.min(r, w/2, h/2);
+    ctx.beginPath();
+    ctx.moveTo(x+rr, y);
+    ctx.arcTo(x+w, y, x+w, y+h, rr);
+    ctx.arcTo(x+w, y+h, x, y+h, rr);
+    ctx.arcTo(x, y+h, x, y, rr);
+    ctx.arcTo(x, y, x+w, y, rr);
+    ctx.closePath();
+  }
+  function easeOutCubic(t){ return 1 - Math.pow(1 - t, 3); }
+
+  let barRects = [];
+  let animState = { start: 0, from: [], to: [], running: false };
+
+  function computeNiceMax(maxVal){
+    if (maxVal <= 1) return 1;
+    const exp = Math.floor(Math.log10(maxVal));
+    const base = Math.pow(10, exp);
+    const mult = maxVal / base;
+    let niceMult;
+    if (mult <= 1) niceMult = 1;
+    else if (mult <= 2) niceMult = 2;
+    else if (mult <= 5) niceMult = 5;
+    else niceMult = 10;
+    return niceMult * base;
+  }
+
+  function drawAxisY(ctx, padL, padR, padT, padB, W, H, niceMax, ticks = 5, label = "Ramos") {
+    const baseY = H - padB;
+    const usableH = H - padT - padB - 35;
+
+    ctx.strokeStyle = "rgba(147,197,253,.55)";
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(padL, baseY);
+    ctx.lineTo(padL, padT + 10);
+    ctx.stroke();
+
+    ctx.textAlign = "right";
+    ctx.textBaseline = "middle";
+    ctx.font = "600 11px system-ui, -apple-system, Segoe UI, Roboto, Arial";
+    ctx.fillStyle = "rgba(214,230,255,.95)";
+    ctx.strokeStyle = "rgba(147,197,253,.25)";
+
+    const step = niceMax / ticks;
+    for (let i = 0; i <= ticks; i++) {
+      const v = i * step;
+      const y = baseY - (v / niceMax) * usableH;
+
+      ctx.beginPath();
+      ctx.moveTo(padL - 5, Math.round(y) + 0.5);
+      ctx.lineTo(padL, Math.round(y) + 0.5);
+      ctx.stroke();
+
+      ctx.fillText(String(Math.round(v)), padL - 8, y);
+    }
+
+    ctx.save();
+    ctx.translate(padL - 32, padT + (usableH / 2));
+    ctx.rotate(-Math.PI / 2);
+    ctx.font = "700 12px system-ui, -apple-system, Segoe UI, Roboto, Arial";
+    ctx.fillStyle = "rgba(214,230,255,.85)";
+    ctx.fillText(label, 0, 0);
+    ctx.restore();
+
+    ctx.strokeStyle = "rgba(147,197,253,.55)";
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(padL, baseY + 0.5);
+    ctx.lineTo(W - padR, baseY + 0.5);
+    ctx.stroke();
+  }
+
+  function drawAxisX(ctx, padL, padR, padT, padB, W, H, displayWorkers, workerNameMap, groupW, label = "") {
+    const baseY = H - padB;
+
+    ctx.textAlign = "right";
+    ctx.textBaseline = "top";
+    ctx.font = "600 11px system-ui, -apple-system, Segoe UI, Roboto, Arial";
+
+    for (let i = 0; i < displayWorkers.length; i++) {
+      const w = displayWorkers[i];
+      const cx = padL + (i + 0.5) * groupW;
+
+      ctx.strokeStyle = "rgba(147,197,253,.35)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(cx, baseY);
+      ctx.lineTo(cx, baseY + 6);
+      ctx.stroke();
+
+      const name = (workerNameMap[w] || "").trim();
+      const show = name && name.toUpperCase() !== w ? name : w;
+
+      ctx.save();
+      ctx.translate(cx, baseY + 8);
+      ctx.rotate(0);
+      ctx.textAlign = "center";
+      ctx.textBaseline = "top";
+      ctx.fillStyle = "rgba(214,230,255,.9)";
+      ctx.fillText(show, 0, 0);
+      ctx.restore();
+    }
+
+    if (label) {
+      ctx.save();
+      ctx.textAlign = "center";
+      ctx.textBaseline = "bottom";
+      ctx.font = "700 12px system-ui, -apple-system, Segoe UI, Roboto, Arial";
+      ctx.fillStyle = "rgba(214,230,255,.85)";
+      ctx.fillText(label, padL + (W - padL - padR) / 2, H - 8);
+      ctx.restore();
+    }
+  }
+
+  function drawGridAndAxis(ctx, padL, padR, padT, padB, W, H, maxV){
+    const baseY = H - padB;
+    const usableH = H - padT - padB - 35;
+    const niceMax = computeNiceMax(maxV);
+    const ticks = 5;
+    const step = niceMax / ticks;
+
+    for (let i = 1; i <= ticks; i++) {
+      const v = i * step;
+      const y = baseY - (v / niceMax) * usableH;
+      ctx.strokeStyle = "rgba(31,51,88,.45)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(padL, crisp(y));
+      ctx.lineTo(W - padR, crisp(y));
+      ctx.stroke();
+    }
+  }
+
+  function getGradient(ctx, x, y, w, h, hex){
+    const g = ctx.createLinearGradient(0, y, 0, y+h);
+    g.addColorStop(0, hex);
+    g.addColorStop(1, "rgba(255,255,255,0.10)");
+    return g;
+  }
+
+  function drawWorkerChart(displayWorkers, counts, stems, noAnimation = false) {
+    if (!ctx) return;
+    setupHiDPICanvas();
+
+    const W = cssW, H = cssH;
+    ctx.clearRect(0, 0, W, H);
+
+    const bg = ctx.createLinearGradient(0, 0, 0, H);
+    bg.addColorStop(0, "rgba(11,18,32,0.55)");
+    bg.addColorStop(1, "rgba(11,18,32,0.20)");
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, W, H);
+
+    const values = displayWorkers.map(w => counts[w] || 0);
+    const stemValues = displayWorkers.map(w => stems[w] || 0);
+
+    const rawMax = Math.max(1, ...values);
+    const niceMax = computeNiceMax(rawMax);
+
+    const padL = 44, padR = 24, padT = 36, padB = 60;
+    const baseY = H - padB;
+    const usableW = W - padL - padR;
+    const usableH = H - padT - padB - 35;
+
+    const winLabel = windowSel.value === "hour" ? "Última hora" : "Total hoy";
+    const onlyActive = (activeSel.value === "active");
+
+    ctx.fillStyle = "white";
+    ctx.font = "700 14px system-ui, -apple-system, Segoe UI, Roboto, Arial";
+    ctx.textAlign = "left";
+    ctx.fillText(`Rendimiento por bonchador (${winLabel})${onlyActive ? " — Solo activos" : ""}`, padL, padT);
+
+    const totalR = values.reduce((a, b) => a + b, 0);
+    const totalT = stemValues.reduce((a, b) => a + b, 0);
+    const hrs = hoursInWindow();
+    kpiText.textContent = `${totalR} ramos | ${totalT} tallos`;
+    kpiSub.textContent = `Promedio: ${(totalR/hrs).toFixed(1)} ramos/h | ${(totalT/hrs).toFixed(1)} tallos/h`;
+
+    if (displayWorkers.length === 0) {
+      ctx.fillStyle = "rgba(200,220,255,0.85)";
+      ctx.font = "600 14px system-ui, -apple-system, Segoe UI, Roboto, Arial";
+      ctx.fillText("Sin actividad en la ventana seleccionada.", padL, baseY - 20);
+      barRects = [];
+      return;
+    }
+
+    drawGridAndAxis(ctx, padL, padR, padT, padB, W, H, niceMax);
+    drawAxisY(ctx, padL, padR, padT, padB, W, H, niceMax, 5, "Ramos");
+
+    const groupW = usableW / Math.max(1, displayWorkers.length);
+    const barW = Math.max(22, Math.min(62, groupW - 14));
+    drawAxisX(ctx, padL, padR, padT, padB, W, H, displayWorkers, workerNameMap, groupW, "");
+
+    const radius = Math.min(10, barW/2);
+    const targetHeights = values.map(v => (v / niceMax) * Math.max(0, usableH));
+
+    if (!animState.running || animState.to.length !== targetHeights.length){
+  animState.from = targetHeights.map(() => 0);
+  animState.to = targetHeights.slice();
+  animState.start = performance.now();
+  animState.running = true;
+  requestAnimationFrame(loop);
+} else {
+  animState.to = targetHeights.slice();
+  if (!animState.running) {
+    animState.start = performance.now();
+    animState.running = true;
+    requestAnimationFrame(loop);
+  }
+}
+
+    function renderAt(progress){
+      barRects = [];
+      ctx.textAlign = "center";
+
+      for (let i = 0; i < displayWorkers.length; i++) {
+        const w = displayWorkers[i];
+        const r = values[i];
+        const t = stemValues[i];
+
+        const x = padL + (i + 0.5) * groupW - barW / 2;
+        const hTarget = (animState.from[i] + (animState.to[i] - animState.from[i]) * progress);
+        const h = Math.max(0, hTarget);
+        const y = baseY - h;
+
+        const hex = (workerColors[w] || "#3B82F6");
+        ctx.fillStyle = hex;
+roundRectPath(ctx, x, y, barW, h, radius);
+ctx.fill();
+
+        ctx.strokeStyle = "rgba(0,0,0,.25)";
+        ctx.lineWidth = 1;
+        roundRectPath(ctx, x, y, barW, h, radius);
+        ctx.stroke();
+
+        const line1 = `${t} tallos`;
+        const line2 = `${r} ramos`;
+        const cx = x + (barW / 2);
+
+        ctx.font = "700 12px system-ui, -apple-system, Segoe UI, Roboto, Arial";
+        ctx.fillStyle = "white";
+        if (h < 44) {
+          ctx.fillText(line1, cx, y - 18);
+          ctx.fillText(line2, cx, y - 2);
+        } else {
+          ctx.fillStyle = "rgba(0,0,0,0.28)";
+          roundRectPath(ctx, cx - (barW-10)/2, y + (h/2) - 20, barW-10, 40, 8);
+          ctx.fill();
+          ctx.fillStyle = "white";
+          ctx.fillText(line1, cx, y + (h/2) - 4);
+          ctx.fillText(line2, cx, y + (h/2) + 12);
+        }
+
+        barRects.push({x, y, w: barW, h, worker: w, ramos: r, tallos: t, cx});
+      }
+    }
+
+    function loop(now){
+      const t = Math.min(1, (now - animState.start) / 650);
+      const p = easeOutCubic(t);
+
+      const W = cssW, H = cssH;
+      ctx.clearRect(0,0,W,H);
+      const bg = ctx.createLinearGradient(0, 0, 0, H);
+      bg.addColorStop(0, "rgba(11,18,32,0.55)");
+      bg.addColorStop(1, "rgba(11,18,32,0.20)");
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, W, H);
+
+      const padL = 44, padR = 24, padT = 36, padB = 60;
+      const winLabel = windowSel.value === "hour" ? "Última hora" : "Total hoy";
+      const onlyActive = (activeSel.value === "active");
+
+      ctx.fillStyle = "white";
+      ctx.font = "700 14px system-ui, -apple-system, Segoe UI, Roboto, Arial";
+      ctx.textAlign = "left";
+      ctx.fillText(`Rendimiento por bonchador (${winLabel})${onlyActive ? " — Solo activos" : ""}`, padL, padT);
+
+      drawGridAndAxis(ctx, padL, padR, padT, padB, W, H, niceMax);
+      drawAxisY(ctx, padL, padR, padT, padB, W, H, niceMax, 5, "Ramos");
+      drawAxisX(ctx, padL, padR, padT, padB, W, H, displayWorkers, workerNameMap, (W - padL - padR)/Math.max(1, displayWorkers.length), "Bonchadores");
+
+      renderAt(p);
+
+      if (t < 1){
+        requestAnimationFrame(loop);
+      } else {
+        animState.running = false;
+        animState.from = animState.to.slice();
+      }
+    }
+  }
+
+  function showTip(x, y, content){
+    chartTip.innerHTML = content;
+    chartTip.style.left = `${x}px`;
+    chartTip.style.top = `${y}px`;
+    chartTip.classList.add("show");
+  }
+
+  function hideTip(){
+    chartTip.classList.remove("show");
+  }
+
+  chart.addEventListener('mousemove', (e)=>{
+    const rect = chart.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    const hit = barRects.find(b =>
+      x >= b.x && x <= (b.x + b.w) && y >= b.y && y <= (b.y + b.h + 4)
+    );
+
+    if (hit){
+      const color = workerColors[hit.worker] || "#93C5FD";
+      const name = (workerNameMap[hit.worker] || hit.worker);
+      const html = `
+        <div class="tt-head">${hit.worker} · ${name}</div>
+        <div class="tt-row"><span class="tt-swatch" style="background:${color}"></span> <b>${hit.ramos}</b>&nbsp;ramos</div>
+        <div class="tt-row"><span class="tt-swatch" style="background:${color};opacity:.7"></span> <b>${hit.tallos}</b>&nbsp;tallos</div>
+      `;
+      showTip(hit.cx, hit.y - 10, html);
+    } else {
+      hideTip();
+    }
+  });
+  chart.addEventListener('mouseleave', hideTip);
+
+  function scansInWindow() {
+  return getFilteredScans();
+}
+
+  function breakdownByWorker() {
+    const byW = {};
+    const rows = scansInWindow();
+
+    for (const r of rows) {
+      const w = String(r.worker || "").trim().toUpperCase();
+      if (!workers.includes(w)) continue;
+
+      const varNombre = r.variedad_nombre || r.variedad_id || "—";
+      const grado = (r.grado_cm != null) ? String(r.grado_cm) : "—";
+      const tallos = Number(r.tallos) || 0;
+
+      if (!byW[w]) byW[w] = { totalRamos: 0, totalTallos: 0, variedades: {} };
+      const itW = byW[w];
+      itW.totalRamos += 1;
+      itW.totalTallos += tallos;
+
+      const key = varNombre;
+      if (!itW.variedades[key]) itW.variedades[key] = { nombre: varNombre, ramos: 0, tallos: 0, grados: {} };
+      const itV = itW.variedades[key];
+      itV.ramos += 1;
+      itV.tallos += tallos;
+
+      if (!itV.grados[grado]) itV.grados[grado] = { ramos: 0, tallos: 0 };
+      itV.grados[grado].ramos += 1;
+      itV.grados[grado].tallos += tallos;
+    }
+    return byW;
+  }
+
+  function sortVarieties(vMap, criterio = "ramos") {
+    const arr = Object.entries(vMap).map(([k, v]) => ({ key: k, ...v }));
+    arr.sort((a, b) => (b[criterio] || 0) - (a[criterio] || 0));
+    return arr;
+  }
+
+  function renderWorkerCards(displayWorkers, counts, stems) {
+    const hrs = hoursInWindow();
+    const byW = breakdownByWorker();
+    workerCards.innerHTML = "";
+
+    for (const w of displayWorkers) {
+      const name = workerNameMap[w] || w;
+      const ramos = counts[w] || 0;
+      const tallos = stems[w] || 0;
+
+      const rph = hrs > 0 ? (ramos / hrs) : 0;
+      const tph = hrs > 0 ? (tallos / hrs) : 0;
+
+      const wData = byW[w] || { totalRamos: 0, totalTallos: 0, variedades: {} };
+      const varArr = sortVarieties(wData.variedades, "ramos");
+
+      const topN = 3;
+      const top = varArr.slice(0, topN);
+      const rest = varArr.slice(topN);
+
+      const makeVarietyRow = (v) => {
+        return `
+          <div class="subRow" style="margin-top:6px;">
+            <span class="subPill"><b>${v.nombre}</b></span>
+            <span class="subPill"><b>${v.ramos}</b> ramos</span>
+            <span class="subPill"><b>${v.tallos}</b> tallos</span>
+          </div>
+        `;
+      };
+
+      const detailsId = `detail-${w}`;
+      const detailHtml = varArr.length ? `
+        <div style="margin-top:10px;border-top:1px dashed rgba(31,51,88,.6);padding-top:8px;">
+          <div class="hint" style="margin-bottom:6px;">Detalle por variedad</div>
+          ${top.map(makeVarietyRow).join("")}
+          ${rest.length ? `
+            <div id="${detailsId}" style="display:none;">
+              ${rest.map(makeVarietyRow).join("")}
+            </div>
+            <button class="ghost" type="button" style="margin-top:6px;" onclick="
+              (function(){
+                const el=document.getElementById('${detailsId}');
+                const btn=this;
+                const show=el.style.display==='none';
+                el.style.display = show ? 'block' : 'none';
+                btn.textContent = show ? 'ver menos' : 'ver todo';
+              }).call(this)
+            ">ver todo</button>
+          ` : ""}
+        </div>
+      ` : "";
+
+      const div = document.createElement("div");
+      div.className = "kpiCard" + (ramos > 0 ? " active" : "");
+      div.innerHTML = `
+        <div class="t">
+          <div class="name">
+            <span class="sw" style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${workerColors[w] || "#93C5FD"};margin-right:8px"></span>
+            ${w} <span class="hint" style="margin-left:6px;">${name}</span>
+          </div>
+          <div class="pill">${windowSel.value === "hour" ? "hora" : "hoy"}</div>
+        </div>
+
+        <div class="bigNum">${ramos}</div>
+        <div class="bigLab">ramos</div>
+
+        <div class="subRow">
+          <span class="subPill"><b>${tallos}</b> tallos</span>
+          <span class="subPill"><b>${rph.toFixed(1)}</b> ramos/h</span>
+          <span class="subPill"><b>${tph.toFixed(1)}</b> tallos/h</span>
+        </div>
+
+        ${detailHtml}
+      `;
+      workerCards.appendChild(div);
+    }
+  }
+
+  function renderPendingBox() {
+    const lines = [];
+    for (const w of workers) {
+      const p = pendingAll[w] || {};
+      const varLabel = (p.variedad_nombre || p.variedad || "—");
+      const grado = (p.grado ?? p.grade ?? "—");
+      const tallos = (p.tallos ?? "—");
+      lines.push(`${w}  VAR:${varLabel}  GR:${grado}  T:${tallos}`);
+    }
+    pendingBox.textContent = lines.join("\n");
+  }
+
+  function renderNamesEditorOnce() {
+    namesBox.innerHTML = "";
+    for (const w of workers) {
+      const row = document.createElement("div");
+      row.className = "row2";
+      row.innerHTML = `
+        <input class="mono" value="${w}" disabled />
+        <input data-worker="${w}" placeholder="Nombre (ej: Juan)" value="${(workerNameMap[w] || "")}" />
+      `;
+      namesBox.appendChild(row);
+    }
+  }
+  function renderWorkerFilter() {
+  if (!workerFilter) return;
+
+  const current = workerFilter.value || "";
+
+  workerFilter.innerHTML = `<option value="">Todos los bonchadores</option>`;
+
+  for (const w of workers) {
+    const option = document.createElement("option");
+    option.value = w;
+    option.textContent = `${w} - ${workerNameMap[w] || w}`;
+
+    if (current === w) option.selected = true;
+
+    workerFilter.appendChild(option);
+  }
+}
+  function populateFilterOptions() {
+  const laminas = [...new Set(
+    scans.map(r => String(r.lamina_id || r.lamina_nombre || "").trim()).filter(Boolean)
+  )].sort();
+
+  const variedades = [...new Set(
+    scans.map(r => String(r.variedad_id || r.variedad_nombre || "").trim()).filter(Boolean)
+  )].sort();
+
+  const currentLamina = laminaFilter.value;
+  const currentVariedad = variedadFilter.value;
+
+  laminaFilter.innerHTML = `<option value="">Todas las láminas</option>` +
+    laminas.map(x => `<option value="${x.toUpperCase()}">${x}</option>`).join("");
+
+  variedadFilter.innerHTML = `<option value="">Todas las variedades</option>` +
+    variedades.map(x => `<option value="${x.toUpperCase()}">${x}</option>`).join("");
+
+  if ([...laminaFilter.options].some(o => o.value === currentLamina)) {
+    laminaFilter.value = currentLamina;
+  }
+
+  if ([...variedadFilter.options].some(o => o.value === currentVariedad)) {
+    variedadFilter.value = currentVariedad;
+  }
+}
+
+  async function saveNames() {
+    const inputs = namesBox.querySelectorAll("input[data-worker]");
+    let successCount = 0;
+
+    for (const inp of inputs) {
+      const code = inp.dataset.worker;
+      const name = (inp.value || "").trim();
+      if (!name) continue;
+
+      try {
+        const res = await fetch(`${API}/api/workers`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code, name })
+        });
+        if (res.ok) successCount++;
+      } catch {}
+    }
+
+    if (successCount > 0) {
+      await loadWorkers();
+      await refreshAll();
+    }
+  }
+  async function deleteScan(id) {
+  if (!id) return;
+
+  const confirmar = confirm(`¿Eliminar el registro ID ${id}?`);
+  if (!confirmar) return;
+
+  try {
+    const res = await fetch(`${API}/api/scans/${encodeURIComponent(id)}`, {
+      method: "DELETE"
+    });
+
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok || !data.ok) {
+      lastScanEl.textContent = data.error || "No se pudo eliminar el registro";
+      return;
+    }
+
+    scans = scans.filter(r => String(r.id) !== String(id));
+
+    lastScanEl.textContent = `Registro ${id} eliminado`;
+
+    renderAll();
+
+  } catch (err) {
+    console.error("Error eliminando registro:", err);
+    lastScanEl.textContent = "Error eliminando registro";
+  }
+}
+
+  function renderTable() {
+  tb.innerHTML = "";
+
+  const workerSelected = (workerFilter?.value || "").trim().toUpperCase();
+
+  const rows = getFilteredScans()
+    .filter(r => {
+      if (!workerSelected) return true;
+      return String(r.worker || "").trim().toUpperCase() === workerSelected;
+    })
+    .sort((a,b) => new Date(b.ts) - new Date(a.ts))
+    .slice(0, 150);
+
+  for (const r of rows) {
+    const name = r.worker_name || workerNameMap[String(r.worker || "").trim()] || "";
+
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td class="mono">${fmtTime(r.ts)}</td>
+      <td><span class="pill">${r.worker || ""}</span></td>
+      <td>${name}</td>
+      <td>${r.tallos ?? ""}</td>
+      <td><span class="pill mono">${r.variedad_nombre ?? r.variedad_id ?? "—"}</span></td>
+      <td>${r.grado_cm || ""}</td>
+      <td><span class="pill mono">${r.lamina_nombre ?? r.lamina_id ?? "—"}</span></td>
+      <td>
+        <button class="btnDeleteScan" data-id="${r.id}">
+          Eliminar
+        </button>
+      </td>
+    `;
+    tb.appendChild(tr);
+  }
+
+  tb.querySelectorAll(".btnDeleteScan").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const id = btn.dataset.id;
+      await deleteScan(id);
+    });
+  });
+
+  countInfo.textContent = `${rows.length} registros visibles`;
+}
+
+function renderSummaryByLamina() {
+  const rows = getFilteredScans();
+  const map = {};
+
+  for (const r of rows) {
+    const laminaKey = String(r.lamina_nombre || r.lamina_id || "SIN LÁMINA").trim();
+    const variedadKey = String(r.variedad_nombre || r.variedad_id || "—").trim();
+    const tallos = Number(r.tallos || 0);
+
+    if (!map[laminaKey]) {
+      map[laminaKey] = {
+        registros: 0,
+        tallos: 0,
+        variedades: {}
+      };
+    }
+
+    map[laminaKey].registros += 1;
+    map[laminaKey].tallos += tallos;
+
+    if (!map[laminaKey].variedades[variedadKey]) {
+      map[laminaKey].variedades[variedadKey] = {
+        ramos: 0,
+        tallos: 0
+      };
+    }
+
+    map[laminaKey].variedades[variedadKey].ramos += 1;
+    map[laminaKey].variedades[variedadKey].tallos += tallos;
+  }
+
+  const sorted = Object.entries(map).sort((a, b) => b[1].registros - a[1].registros);
+
+  laminaCards.innerHTML = "";
+
+  if (!sorted.length) {
+    laminaCards.innerHTML = `<div class="hint">Sin datos por lámina</div>`;
+    return;
+  }
+
+  for (const [lamina, vals] of sorted) {
+    const variedades = Object.entries(vals.variedades)
+      .sort((a, b) => b[1].ramos - a[1].ramos)
+      .map(([nombre, v]) => `
+        <div class="subRow" style="margin-top:6px;">
+          <span class="subPill"><b>${nombre}</b></span>
+          <span class="subPill"><b>${v.ramos}</b> ramos</span>
+          <span class="subPill"><b>${v.tallos}</b> tallos</span>
+        </div>
+      `)
+      .join("");
+
+    const div = document.createElement("div");
+    div.className = "kpiCard laminaCard";
+    div.innerHTML = `
+      <div class="t">
+        <div class="name" style="font-size:20px;">${lamina}</div>
+        <div class="pill">Lámina</div>
+      </div>
+
+      <div class="bigNum" style="font-size:42px;">${vals.registros}</div>
+      <div class="bigLab" style="font-size:14px;">ramos totales</div>
+
+      <div class="subRow" style="margin-top:12px;">
+        <span class="subPill" style="font-size:14px;"><b>${vals.tallos}</b> tallos totales</span>
+      </div>
+
+      <div style="margin-top:12px;border-top:1px dashed rgba(31,51,88,.6);padding-top:10px;backgroud-color: ##19546b;">
+        <div class="hint" style="font-size:13px;margin-bottom:6px;">Variedades trabajadas en esta lámina</div>
+        ${variedades || `<div class="hint">Sin variedades</div>`}
+      </div>
+    `;
+    laminaCards.appendChild(div);
+  }
+}
+
+function renderSummaryByVariedad() {
+  const rows = getFilteredScans();
+  const map = {};
+
+  for (const r of rows) {
+    const key = String(r.variedad_nombre || r.variedad_id || "—").trim();
+    if (!map[key]) map[key] = { registros: 0, tallos: 0 };
+    map[key].registros += 1;
+    map[key].tallos += Number(r.tallos || 0);
+  }
+
+  const sorted = Object.entries(map).sort((a, b) => b[1].registros - a[1].registros);
+
+  tbVariedad.innerHTML = sorted.map(([variedad, vals]) => `
+    <tr>
+      <td><span class="pill mono">${variedad}</span></td>
+      <td>${vals.registros}</td>
+      <td>${vals.tallos}</td>
+    </tr>
+  `).join("") || `
+    <tr><td colspan="3" class="hint">Sin datos</td></tr>
+  `;
+}
+
+function renderAll() {
+  const counts = countsByWorker();
+  const stems  = stemsByWorkerFiltered();
+
+  const displayWorkers = getDisplayWorkers(counts);
+  const graphWorkers = (activeSel.value === "active") ? getActiveWorkers(counts) : displayWorkers;
+
+  renderPendingBox();
+  buildLegend(displayWorkers);
+  drawWorkerChart(graphWorkers, counts, stems);
+  renderWorkerCards(displayWorkers, counts, stems);
+  renderSummaryByLamina();
+  renderSummaryByVariedad();
+  renderTable();
+}
+
+  async function loadWorkers() {
+  const res = await fetch(API + "/api/workers", {cache:"no-store"}).catch(()=>null);
+
+  if (!res || !res.ok) {
+    workerNameMap = workerNameMap || {};
+
+    workers.forEach((w,i)=> {
+      workerColors[w] = workerColors[w] || palette[i % palette.length];
+    });
+
+    renderNamesEditorOnce();
+    renderWorkerFilter();
+
+    return;
+  }
+
+  const arr = await res.json();
+
+  workers = arr.map(x => String(x.code).trim().toUpperCase());
+
+  workerNameMap = {};
+  for (const it of arr) {
+    workerNameMap[String(it.code).trim().toUpperCase()] = it.name;
+  }
+
+  workers.forEach((w,i)=> {
+    workerColors[w] = workerColors[w] || palette[i % palette.length];
+  });
+
+  renderNamesEditorOnce();
+  renderWorkerFilter();
+}
+
+  async function refreshAll() {
+    const [pRes, sRes] = await Promise.all([
+      fetch(API + "/api/pendingAll", {cache:"no-store"}).catch(()=>null),
+      fetch(API + "/api/scans?limit=500", {cache:"no-store"})
+    ]);
+
+    if (pRes && pRes.ok) pendingAll = await pRes.json();
+    if (sRes && sRes.ok) scans = await sRes.json();
+    renderAll();
+  }
+
+  function parseBonchador(code) {
+  const up = String(code || "").trim().toUpperCase();
+  const m = up.match(/^B(\d{1,2})-T(\d{1,3})$/);
+  if (!m) return null;
+
+  const n = parseInt(m[1], 10);
+  const t = parseInt(m[2], 10);
+
+  if (n < 1 || n > 12) return null;
+  if (!Number.isFinite(t) || t <= 0) return null;
+
+  const codeFixed = `B${String(n).padStart(2, "0")}`;
+
+  return {
+    raw: `${codeFixed}-T${t}`,
+    code: codeFixed,
+    tallos: t
+  };
+}
+
+  function parseV(code) {
+  const up = String(code || "").trim().toUpperCase();
+  const m = up.match(/^V(\d{1,2})$/);
+  if (!m) return null;
+
+  const n = parseInt(m[1], 10);
+  if (!Number.isFinite(n) || n <= 0) return null;
+
+  const variedadFixed = `V${String(n).padStart(2, "0")}`;
+
+  return {
+    raw: variedadFixed,
+    variedad: variedadFixed
+  };
+}
+function parseG(code) {
+  const up = String(code || "").trim().toUpperCase();
+
+  // Acepta G60 o 60
+  const m = up.match(/^G?(\d{1,3})$/);
+  if (!m) return null;
+
+  const grado = parseInt(m[1], 10);
+  if (!Number.isFinite(grado) || grado <= 0) return null;
+
+  return {
+    raw: `G${grado}`,
+    grado
+  };
+}
+
+  function parseL(code) {
+    const up = String(code||"").trim().toUpperCase();
+    const m = up.match(/^L(\d{1,3})$/);
+    if (!m) return null;
+    const n = parseInt(m[1],10);
+    if (!Number.isFinite(n) || n <= 0) return null;
+    return { raw: up, id: "L" + n };
+  }
+
+  function detectBarcodeType(code) {
+  const up = String(code || "").trim().toUpperCase();
+  const b = parseBonchador(up);
+  const v = parseV(up);
+  const g = parseG(up);
+  const l = parseL(up);
+
+  return {
+    up,
+    isB: !!b,
+    isV: !!v,
+    isG: !!g,
+    isL: !!l,
+    b,
+    v,
+    g,
+    l
+  };
+}
+
+  function setLastWorkerUI(txt) {
+    if (!lastWorkerEl) return;
+    if (txt) { lastWorkerEl.textContent = txt; lastWorkerEl.className = "mono okTxt"; }
+    else { lastWorkerEl.textContent = "—"; lastWorkerEl.className = "mono warnTxt"; }
+  }
+
+  function setLastVUI(txt) {
+    if (!lastVEl) return;
+    if (txt) { lastVEl.textContent = txt; lastVEl.className = "mono okTxt"; }
+    else { lastVEl.textContent = "—"; lastVEl.className = "mono warnTxt"; }
+  }
+  function setLastGUI(txt) {
+  if (!lastGEl) return;
+
+  if (txt) {
+    lastGEl.textContent = txt;
+    lastGEl.className = "mono okTxt";
+  } else {
+    lastGEl.textContent = "—";
+    lastGEl.className = "mono warnTxt";
+  }
+}
+
+  function setLastLUI(txt) {
+    if (!lastLEl) return;
+    if (txt) { lastLEl.textContent = txt; lastLEl.className = "mono okTxt"; }
+    else { lastLEl.textContent = "—"; lastLEl.className = "mono warnTxt"; }
+  }
+
+  function updateScanProgressUI() {
+  const steps = [
+    { el: stepWorker, label: "Bonchador", done: !!pendingWorker },
+    { el: stepVariedad, label: "Variedad", done: !!pendingV },
+    { el: stepGrado, label: "Grado", done: !!pendingG },
+    { el: stepLamina, label: "Lámina", done: !!pendingL }
+  ];
+
+  const faltantes = [];
+
+  for (const s of steps) {
+    if (!s.el) continue;
+
+    s.el.classList.toggle("done", s.done);
+    s.el.classList.toggle("pending", !s.done);
+
+    s.el.innerHTML = s.done
+      ? `<span>${s.label}</span><b>OK</b>`
+      : `<span>${s.label}</span><b>Falta</b>`;
+
+    if (!s.done) faltantes.push(s.label);
+  }
+
+  if (!scanMissingText) return;
+
+  if (faltantes.length === 0) {
+    scanMissingText.textContent = "Registro completo. Enviando...";
+    scanMissingText.classList.add("ready");
+  } else {
+    scanMissingText.textContent = `Falta: ${faltantes.join(", ")}`;
+    scanMissingText.classList.remove("ready");
+  }
+}
+
+  function limpiarEscaneoPendiente(mensaje = "Escaneo cancelado") {
+  pendingWorker = null;
+  pendingV = null;
+  pendingG = null;
+  pendingL = null;
+
+  setLastWorkerUI(null);
+  setLastVUI(null);
+  setLastGUI(null);
+  setLastLUI(null);
+
+  lastScanEl.textContent = mensaje;
+  updateScanProgressUI();
+}
+
+  async function sendToServer(payload) {
+  try {
+    const res = await fetch(API + "/api/scan", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+
+    let data = null;
+    try { 
+      data = await res.json(); 
+    } catch {}
+
+    return { ok: res.ok, data, offline: false };
+
+  } catch (err) {
+    saveOfflineScan(payload);
+
+    return {
+      ok: true,
+      offline: true,
+      data: {
+        ok: true,
+        mensaje: "Guardado offline pendiente de sincronizar"
+      }
+    };
+  }
+}
+
+  async function trySendCombo() {
+  if (!(pendingWorker && pendingV && pendingG && pendingL)) return;
+
+  const payload = {
+    worker: pendingWorker.raw,
+    variedad: pendingV.raw,
+    grado: pendingG.raw,
+    lamina: pendingL.raw
+  };
+
+  const out = await sendToServer(payload);
+
+  if (!out.ok) {
+    const msg = out.data?.error || "ERROR";
+    lastScanEl.textContent = `${pendingWorker.raw} / ${pendingV.raw} / ${pendingG.raw} / ${pendingL.raw} (${msg})`;
+    return;
+  }
+
+  // Limpia los 4 escaneos pendientes, tanto si guardó online como offline
+  pendingWorker = null;
+  pendingV = null;
+  pendingG = null;
+  pendingL = null;
+
+  setLastWorkerUI(null);
+  setLastVUI(null);
+  setLastGUI(null);
+  setLastLUI(null);
+
+  updateScanProgressUI();
+
+  // Caso sin internet: quedó guardado localmente
+  if (out.offline) {
+  lastScanEl.textContent = "SIN INTERNET → Registro guardado offline pendiente por sincronizar";
+
+  const pendientes = getOfflineQueue().length;
+  showOfflineStatus(`SIN INTERNET · ${pendientes} registro(s) offline pendiente(s)`, "warn");
+
+  if (typeof playOkSound === "function") {
+    playOkSound();
+  }
+
+  return;
+}
+
+  // Caso normal: guardado en servidor
+  if (out.data?.reg) {
+    scans.unshift(out.data.reg);
+    renderAll();
+
+    if (typeof playOkSound === "function") {
+      playOkSound();
+    }
+  } else {
+    await refreshAll();
+  }
+}
+
+async function syncOfflineScans() {
+  const queue = getOfflineQueue();
+  if (!queue.length) return;
+
+  for (const item of queue) {
+    try {
+      const res = await fetch(API + "/api/scan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(item.payload)
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (res.ok && data.ok) {
+        removeOfflineScan(item.idLocal);
+      }
+    } catch {
+      return;
+    }
+  }
+
+  await refreshAll();
+}
+
+  async function postScan(rawCode) {
+  const up = String(rawCode || "").trim().toUpperCase();
+
+  // Código especial para cancelar el registro en construcción
+  if (up === "E123") {
+    limpiarEscaneoPendiente("E123 → REGISTRO EN CONSTRUCCIÓN BORRADO");
+    return;
+  }
+
+  const { isB, isV, isG, isL, b, v, g, l } = detectBarcodeType(up);
+  lastScanEl.textContent = up;
+
+  if (!isB && !isV && !isG && !isL) {
+    lastScanEl.textContent = up + " (NO RECONOCIDO)";
+    return;
+  }
+
+  if (isB) {
+  pendingWorker = b;
+  setLastWorkerUI(pendingWorker.raw);
+  updateScanProgressUI();
+  await trySendCombo();
+  return;
+}
+
+if (isV) {
+  pendingV = v;
+  setLastVUI(pendingV.raw);
+  updateScanProgressUI();
+  await trySendCombo();
+  return;
+}
+
+if (isG) {
+  pendingG = g;
+  setLastGUI(pendingG.raw);
+  updateScanProgressUI();
+  await trySendCombo();
+  return;
+}
+
+if (isL) {
+  pendingL = l;
+  setLastLUI(pendingL.raw);
+  updateScanProgressUI();
+  await trySendCombo();
+}
+}
+let globalScanBuffer = "";
+let globalScanTimer = null;
+
+function isUserEditing() {
+  const el = document.activeElement;
+  if (!el) return false;
+
+  const tag = el.tagName?.toLowerCase();
+
+  if (tag === "select" || tag === "textarea") return true;
+
+  if (tag === "input" && el !== scanInput) return true;
+
+  return false;
+}
+
+document.addEventListener("keydown", async (e) => {
+  if (e.ctrlKey || e.altKey || e.metaKey) return;
+  if (isUserEditing()) return;
+
+  // Si el input oculto ya tiene el foco, no duplicar el escaneo
+  if (document.activeElement === scanInput) return;
+
+  if (e.key === "Enter" || e.key === "Tab") {
+    const code = globalScanBuffer.trim();
+    globalScanBuffer = "";
+
+    if (globalScanTimer) {
+      clearTimeout(globalScanTimer);
+      globalScanTimer = null;
+    }
+
+    if (code) {
+      e.preventDefault();
+      await postScan(code);
+    }
+
+    return;
+  }
+
+  if (e.key.length === 1) {
+    e.preventDefault();
+    globalScanBuffer += e.key;
+
+    if (globalScanTimer) clearTimeout(globalScanTimer);
+
+    globalScanTimer = setTimeout(() => {
+      globalScanBuffer = "";
+    }, 700);
+  }
+}, true);
+  manualScan.addEventListener("keydown", async (e) => {
+    if (e.key !== "Enter") return;
+    const code = (manualScan.value || "").trim();
+    manualScan.value = "";
+    if (!code) return;
+    await postScan(code);
+  });
+
+  btnFocus.addEventListener("click", focusScan);
+  document.addEventListener("keydown", (e) => { if (e.key === "F9") focusScan(); });
+
+  let buffer = "";
+  scanInput.addEventListener("input", () => { buffer = scanInput.value; });
+  scanInput.addEventListener("keydown", async (e) => {
+    if (e.key !== "Enter") return;
+    const barcode = (buffer || "").trim();
+    scanInput.value = "";
+    buffer = "";
+    if (!barcode) return;
+    await postScan(barcode);
+  });
+
+  btnRefresh.addEventListener("click", refreshAll);
+  windowSel.addEventListener("change", renderAll);
+  activeSel.addEventListener("change", renderAll);
+  btnSaveNames.addEventListener("click", saveNames);
+  workerFilter?.addEventListener("change", renderAll);
+
+  let pollTimer = null;
+
+  function startPollingFallback() {
+    if (pollTimer) clearInterval(pollTimer);
+    pollTimer = setInterval(async () => { await refreshAll(); }, 8000);
+  }
+
+  function startSSE() {
+    try { es?.close(); } catch {}
+    es = new EventSource(API + "/api/stream");
+
+    es.onopen = () => {
+      setStatus(true, "Conectado", "SSE");
+      startPollingFallback();
+    };
+
+    es.onmessage = (ev) => {
+      try {
+        const msg = JSON.parse(ev.data);
+
+        if (msg.kind === "snapshot") {
+          scans = msg.snapshot || [];
+          pendingAll = msg.pending || {};
+          if (msg.workers) {
+            workers = msg.workers.map(x => String(x.code).trim().toUpperCase());
+            workerNameMap = {};
+            for (const it of msg.workers) workerNameMap[String(it.code).trim().toUpperCase()] = it.name;
+            workers.forEach((w,i)=> workerColors[w] = workerColors[w] || palette[i % palette.length]);
+            renderNamesEditorOnce();
+          }
+          renderAll();
+          return;
+        }
+
+        if (msg.kind === "workers" && msg.workers) {
+          workers = msg.workers.map(x => String(x.code).trim().toUpperCase());
+          workerNameMap = {};
+          for (const it of msg.workers) workerNameMap[String(it.code).trim().toUpperCase()] = it.name;
+          workers.forEach((w,i)=> workerColors[w] = workerColors[w] || palette[i % palette.length]);
+          renderNamesEditorOnce();
+          renderAll();
+          return;
+        }
+
+        if (msg.kind === "pendingAll") {
+          pendingAll = msg.pending || {};
+          renderAll();
+          return;
+        }
+
+        if (msg.kind === "scan" && msg.reg) {
+  scans.unshift(msg.reg);
+  if (scans.length > 500) scans = scans.slice(0, 500);
+  renderFast();
+  return;
+}
+if (msg.kind === "delete" && msg.id) {
+  scans = scans.filter(r => String(r.id) !== String(msg.id));
+  renderAll();
+  return;
+}
+      } catch {}
+    };
+
+    es.onerror = () => {
+      setStatus(true, "Conectado", "SSE falló → usando polling");
+      startPollingFallback();
+    };
+  }
+
+  function renderFast() {
+  const counts = countsByWorker();
+  const stems  = stemsByWorkerFiltered();
+
+  const displayWorkers = getDisplayWorkers(counts);
+  const graphWorkers = (activeSel.value === "active") ? getActiveWorkers(counts) : displayWorkers;
+
+  renderPendingBox();
+  buildLegend(displayWorkers);
+  drawWorkerChart(graphWorkers, counts, stems, true);
+  renderWorkerCards(displayWorkers, counts, stems);
+  renderSummaryByLamina();
+  renderSummaryByVariedad();
+  renderTable();
+}
+
+  function installResizeObservers() {
+    if ('ResizeObserver' in window) {
+      resizeObserver = new ResizeObserver(() => {
+        setupHiDPICanvas();
+        renderAll();
+      });
+      resizeObserver.observe(chart);
+    } else {
+      window.addEventListener('resize', () => {
+        setupHiDPICanvas();
+        renderAll();
+      });
+    }
+
+    const dprQuery = `(resolution: ${Math.round(window.devicePixelRatio||1)}dppx)`;
+    mediaDPR = window.matchMedia(dprQuery);
+    if (mediaDPR && mediaDPR.addEventListener) {
+      mediaDPR.addEventListener('change', () => {
+        chart.__cssW = chart.__cssH = chart.__dpr = undefined;
+        setupHiDPICanvas();
+        renderAll();
+        installResizeObservers();
+      }, { once:true });
+    }
+  }
+
+  const INTERACTIVE_SELECTOR = 'input, select, textarea, [contenteditable="true"], button:not(#btnFocus):not(#btnSerial)';
+  let suspendAutoFocus = false;
+
+  function focusScanInput() {
+    if (suspendAutoFocus) return;
+    captureEnabled = true;
+    setCaptureUI();
+    if (scanInput) {
+      scanInput.setAttribute("tabindex", "0");
+      scanInput.focus({ preventScroll: true });
+      const v = scanInput.value; scanInput.value = ""; scanInput.value = v;
+    }
+  }
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") {
+      focusScanInput();
+      requestWakeLock();
+    } else {
+      releaseWakeLock();
+    }
+  });
+
+  window.addEventListener("focus", () => {
+    focusScanInput();
+    requestWakeLock();
+  });
+
+  scanInput?.addEventListener("blur", () => {
+    if (document.visibilityState === "visible") setTimeout(focusScanInput, 0);
+  });
+
+  setInterval(() => {
+    if (!suspendAutoFocus && document.visibilityState === "visible" && document.activeElement !== scanInput) {
+      focusScanInput();
+    }
+  }, 1500);
+
+  document.addEventListener("focusin", (e) => {
+    const t = e.target;
+    if (t && t !== scanInput && t.matches(INTERACTIVE_SELECTOR)) {
+      suspendAutoFocus = true;
+    }
+  });
+
+  document.addEventListener("focusout", (e) => {
+    const t = e.target;
+    if (t && t.matches(INTERACTIVE_SELECTOR)) {
+      setTimeout(() => {
+        if (!document.querySelector(`${INTERACTIVE_SELECTOR}:focus`)) {
+          suspendAutoFocus = false;
+          focusScanInput();
+        }
+      }, 120);
+    }
+  }, true);
+
+  windowSel.addEventListener("mousedown", () => { suspendAutoFocus = true; });
+  windowSel.addEventListener("change", () => { suspendAutoFocus = false; renderAll(); focusScanInput(); });
+  windowSel.addEventListener("blur", () => { suspendAutoFocus = false; focusScanInput(); });
+
+  activeSel.addEventListener("mousedown", () => { suspendAutoFocus = true; });
+  activeSel.addEventListener("change", () => { suspendAutoFocus = false; renderAll(); focusScanInput(); });
+  activeSel.addEventListener("blur", () => { suspendAutoFocus = false; focusScanInput(); });
+
+  namesBox.addEventListener("focusin", (e) => {
+    if (e.target && e.target.matches('input[data-worker]')) suspendAutoFocus = true;
+  });
+
+  namesBox.addEventListener("focusout", (e) => {
+    if (e.target && e.target.matches('input[data-worker]')) {
+      setTimeout(() => {
+        if (!namesBox.querySelector('input[data-worker]:focus')) {
+          suspendAutoFocus = false;
+          focusScanInput();
+        }
+      }, 120);
+    }
+  }, true);
+
+  btnSaveNames.addEventListener("click", () => {
+    setTimeout(() => { suspendAutoFocus = false; focusScanInput(); }, 200);
+  });
+
+  btnFocus.addEventListener("click", () => { suspendAutoFocus = false; focusScanInput(); });
+  document.addEventListener("keydown", (e) => { if (e.key === "F9") { suspendAutoFocus = false; focusScanInput(); } });
+
+  let wakeLock = null;
+  async function requestWakeLock() {
+    try {
+      if ("wakeLock" in navigator && document.visibilityState === "visible") {
+        wakeLock = await navigator.wakeLock.request("screen");
+        wakeLock.addEventListener("release", () => {});
+      }
+    } catch {}
+  }
+  async function releaseWakeLock() { try { await wakeLock?.release(); } catch{} wakeLock = null; }
+
+  let serialPort = null;
+  let serialReader = null;
+  let serialReading = false;
+
+  function setSerialState(text, ok=false) {
+    if (!serialState) return;
+    serialState.textContent = "SERIAL: " + text;
+    serialState.className = "pill mono " + (ok ? "okTxt" : "warnTxt");
+  }
+
+  async function startSerialReadLoop(port) {
+    const textDecoder = new TextDecoderStream();
+    port.readable.pipeTo(textDecoder.writable).catch(()=>{});
+    const reader = textDecoder.readable.getReader();
+    serialReader = reader;
+    serialReading = true;
+
+    let sBuffer = "";
+    try {
+      while (serialReading) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        if (value) {
+          sBuffer += value;
+          let idx;
+          while ((idx = sBuffer.search(/\r|\n/)) >= 0) {
+            const line = sBuffer.slice(0, idx).trim();
+            sBuffer = sBuffer.slice(idx + 1);
+            if (line) {
+              lastScanEl && (lastScanEl.textContent = line);
+              await postScan(line);
+            }
+          }
+        }
+      }
+    } catch {} finally { try { reader.releaseLock(); } catch {} }
+  }
+
+  async function openSerialPort(port) {
+    await port.open({ baudRate: 9600 });
+    setSerialState("CONECTADO", true);
+    serialPort = port;
+
+    navigator.serial.addEventListener("disconnect", (ev) => {
+      if (ev.target === serialPort) {
+        setSerialState("DESCONECTADO");
+        serialReading = false;
+        serialPort = null;
+      }
+    });
+
+    await startSerialReadLoop(port);
+  }
+
+  async function connectSerial() {
+    try {
+      if (!("serial" in navigator)) {
+        alert("Tu navegador no soporta Web Serial. Usa Chrome/Edge reciente o conecta como teclado.");
+        setSerialState("NO SOPORTADO");
+        return;
+      }
+
+      const ports = await navigator.serial.getPorts();
+      if (ports && ports.length && !serialPort) {
+        await openSerialPort(ports[0]);
+        return;
+      }
+
+      const port = await navigator.serial.requestPort({});
+      await openSerialPort(port);
+    } catch {
+      setSerialState("DESCONECTADO");
+    }
+  }
+
+  btnSerial?.addEventListener("click", connectSerial);
+
+  function activarEscaneoInicial() {
+  suspendAutoFocus = false;
+  captureEnabled = true;
+  setCaptureUI();
+
+  setTimeout(() => {
+    focusScanInput();
+  }, 100);
+
+  setTimeout(() => {
+    focusScanInput();
+  }, 400);
+
+  setTimeout(() => {
+    focusScanInput();
+  }, 1000);
+}
+
+document.addEventListener("DOMContentLoaded", activarEscaneoInicial);
+window.addEventListener("load", activarEscaneoInicial);
+window.addEventListener("pageshow", activarEscaneoInicial);
+
+(async () => {
+  activarEscaneoInicial();
+
+  try {
+      await loadWorkers();
+      pillApi.textContent = "API: OK";
+      setStatus(true, "Conectado", "API");
+      await refreshAll();
+      startSSE();
+    } catch {
+      pillApi.textContent = "API: error";
+      setStatus(false, "Sin API", "Inicia node server.js en 127.0.0.1:3000");
+    }
+
+    if ("serial" in navigator) {
+      try {
+        const ports = await navigator.serial.getPorts();
+        if (ports && ports.length) await openSerialPort(ports[0]);
+      } catch {}
+    }
+
+    setupHiDPICanvas();
+    renderAll();
+    installResizeObservers();
+    updateScanProgressUI();
+
+    setInterval(async () => {
+  if (!navigator.onLine) return;
+
+  const pendientes = getOfflineQueue().length;
+  if (pendientes <= 0) return;
+
+  showOfflineStatus(`Sincronizando ${pendientes} registro(s) offline...`, "ok");
+
+  await syncOfflineScans();
+
+  const restantes = getOfflineQueue().length;
+
+  if (restantes > 0) {
+    showOfflineStatus(`${restantes} registro(s) offline siguen pendientes`, "warn");
+  } else {
+    showOfflineStatus("Pendientes offline sincronizados", "ok");
+    hideOfflineStatusAfter(5000);
+  }
+}, 10000);
+window.addEventListener("online", async () => {
+  showOfflineStatus("Internet recuperado · sincronizando pendientes...", "ok");
+
+  await syncOfflineScans();
+
+  const pendientes = getOfflineQueue().length;
+
+  if (pendientes > 0) {
+    showOfflineStatus(`${pendientes} registro(s) offline siguen pendientes`, "warn");
+  } else {
+    showOfflineStatus("Sincronización offline finalizada", "ok");
+    hideOfflineStatusAfter(5000);
+  }
+});
+
+  })();
+})();
+</script>
+</body>
+</html>
