@@ -234,7 +234,7 @@ async function getLaminaActiva(laminaId) {
    GUARDADO EN DB
    ========================================================== */
 
-async function saveScan(wObj, vObj, gObj, lObj) {
+async function saveScan(wObj, vObj, gObj, lObj, variedadNombre) {
   const client = await pool.connect();
 
   try {
@@ -246,12 +246,13 @@ async function saveScan(wObj, vObj, gObj, lObj) {
         worker,
         tallos,
         variedad_id,
+        variedad_nombre,
         grado_cm,
         raw_a,
         raw_b,
         lamina_id
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       RETURNING *
     `;
 
@@ -260,6 +261,7 @@ async function saveScan(wObj, vObj, gObj, lObj) {
       wObj.code,           // B01
       wObj.tallos,         // 20
       vObj.variedad_id,    // V01
+      variedadNombre,
       gObj.grado_cm,       // 60
       wObj.raw,            // B01-T20
       `${vObj.raw}-${gObj.raw}`, // V01-G60
@@ -339,7 +341,7 @@ app.post("/api/scan", async (req, res) => {
       });
     }
 
-    const savedReg = await saveScan(wObj, vObj, gObj, lObj);
+    const savedReg = await saveScan(wObj, vObj, gObj, lObj, variedadDb.nombre);
 
     const broadcastData = {
       ...savedReg,
