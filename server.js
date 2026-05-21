@@ -262,7 +262,7 @@ async function saveScan(wObj, vObj, gObj, lObj) {
       wObj.tallos,         // 20
       vObj.variedad_id,    // V01
       gObj.grado_cm,       // 60
-      variedad_nombre,
+      vObj.variedad_nombre,
       wObj.raw,            // B01-T20
       `${vObj.raw}-${gObj.raw}`, // V01-G60
       lObj.id              // L1
